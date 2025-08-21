@@ -1,0 +1,63 @@
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+
+# --- Python bytecode / cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Environment / secrets ---
+.env
+.env.*
+.envrc
+
+# --- Packaging / build artifacts ---
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+wheelhouse/
+
+# --- Test / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# --- Type checking / linters ---
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# --- Notebooks ---
+.ipynb_checkpoints
+
+# --- Logs / temp ---
+logs/
+*.log
+/tmp/
+
+# --- Project-specific ---
+# Kafka UI or transient data (if generated locally)
+kafka-ui/
+# Local data scratch space
+.data/
+
+# --- Node artifacts at repo root (none expected, safety) ---
+node_modules/ 
