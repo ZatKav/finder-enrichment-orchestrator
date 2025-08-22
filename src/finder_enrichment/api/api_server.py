@@ -41,11 +41,10 @@ load_dotenv()
 # Configure logging
 logger = setup_logger(__name__)
 
-# Immediate startup logging
-logger.critical("🚀 CRITICAL: api_server.py is being loaded and executed!")
-logger.critical(f"🚀 CRITICAL: Current working directory: {os.getcwd()}")
-logger.critical(f"🚀 CRITICAL: Python path: {sys.path}")
-logger.critical(f"🚀 CRITICAL: Environment variables loaded: {[k for k in os.environ.keys() if 'DB' in k or 'GEMINI' in k or 'DASHBOARD' in k]}")
+# Basic startup logging
+logger.info("Finder Enrichment API server starting up...")
+logger.debug(f"Working directory: {os.getcwd()}")
+logger.debug(f"Python path: {sys.path}")
 
 # Try to import orchestrator and agent modules with error handling
 try:
@@ -67,10 +66,10 @@ except ImportError as e:
 
 def initialize_orchestrator():
     """Initialize the orchestrator immediately when the module is loaded."""
-    logger.critical("🚀 CRITICAL: Manual orchestrator initialization starting!")
+    logger.info("Starting orchestrator initialization...")
 
     # Check if required modules were imported successfully
-    logger.info(f"Modules imported successfully: {modules_imported}")
+    logger.debug(f"Modules imported successfully: {modules_imported}")
     if not modules_imported:
         error_msg = "Required modules failed to import - check import dependencies"
         logger.error(error_msg)
@@ -84,7 +83,7 @@ def initialize_orchestrator():
         logger.error(f"Orchestrator initialization failed due to import errors. Error details: {g.orchestrator_error}")
         return
 
-        # Validate required environment variables
+    # Validate required environment variables
     required_env_vars = [
         "LISTINGS_DB_BASE_URL",
         "LISTINGS_DB_API_KEY",
@@ -94,7 +93,7 @@ def initialize_orchestrator():
     ]
 
     missing_env_vars = [var for var in required_env_vars if not os.getenv(var)]
-    logger.info(f"Missing environment variables: {missing_env_vars}")
+    logger.debug(f"Missing environment variables: {missing_env_vars}")
 
     if missing_env_vars:
         error_msg = f"Missing required environment variables: {missing_env_vars}"
@@ -180,7 +179,6 @@ def initialize_orchestrator():
             logger.error(f"Failed to set service clients on orchestrator: {e}", exc_info=True)
             raise RuntimeError(f"Service client configuration failed: {e}")
 
-        logger.critical("🚀 CRITICAL: Orchestrator initialized successfully!")
         logger.info("Orchestrator initialized successfully")
 
     except Exception as e:
@@ -200,19 +198,19 @@ def initialize_orchestrator():
 
 
 # Create FastAPI app
-logger.critical("🚀 CRITICAL: About to create FastAPI app!")
+logger.info("Creating FastAPI app...")
 app = FastAPI(
     title="Finder Enrichment API",
     description="API for triggering property listing enrichment processes",
     version="1.0.0"
     # Removed lifespan parameter - will initialize manually
 )
-logger.critical("🚀 CRITICAL: FastAPI app created successfully!")
+logger.info("FastAPI app created successfully")
 
 # Initialize orchestrator immediately after app creation
-logger.critical("🚀 CRITICAL: Calling manual orchestrator initialization!")
+logger.info("Initializing orchestrator...")
 initialize_orchestrator()
-logger.critical("🚀 CRITICAL: Manual orchestrator initialization completed!")
+logger.info("Orchestrator initialization completed")
 
 # Setup rate limiting
 setup_rate_limiting(app)
@@ -241,9 +239,7 @@ else:
 @app.get("/")
 async def root():
     """Root endpoint."""
-    logger.critical("🚀 CRITICAL: Root endpoint called - app is definitely running!")
     orchestrator_status = g.orchestrator is not None
-    logger.critical(f"🚀 CRITICAL: Orchestrator status: {'initialized' if orchestrator_status else 'not_initialized'}")
     return {
         "message": "Finder Enrichment API",
         "version": "1.0.0",
@@ -268,43 +264,7 @@ async def startup_check():
     }
 
 
-@app.get("/debug/environment-summary")
-async def get_environment_summary():
-    """
-    Debug endpoint to log current environment variable state.
-    This will help identify missing environment variables.
-    """
-    required_env_vars = [
-        "LISTINGS_DB_BASE_URL",
-        "LISTINGS_DB_API_KEY",
-        "ENRICHMENT_DB_BASE_URL",
-        "ENRICHMENT_DB_API_KEY",
-        "GOOGLE_GEMINI_API_KEY"
-    ]
 
-    env_summary = {}
-    missing_vars = []
-
-    for var in required_env_vars:
-        value = os.getenv(var)
-        is_set = value is not None and value.strip() != ""
-        env_summary[var] = {
-            "configured": is_set,
-            "value_preview": "***configured***" if is_set else None,
-            "length": len(value) if value else 0
-        }
-        if not is_set:
-            missing_vars.append(var)
-
-    logger.error(f"Environment summary check - Missing variables: {missing_vars}")
-    logger.error(f"Environment summary check - Configured variables: {env_summary}")
-
-    return {
-        "environment_summary": env_summary,
-        "missing_variables": missing_vars,
-        "all_configured": len(missing_vars) == 0,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
 
 
 @app.get("/jobs")
@@ -398,9 +358,6 @@ async def health_check():
    
 if __name__ == "__main__":
     import uvicorn
-
-    logger.critical("🚀 CRITICAL: Main execution block reached!")
-    logger.critical("🚀 CRITICAL: About to start uvicorn server!")
 
     logger.info("Starting Finder Enrichment API server on localhost:3100")
     uvicorn.run(
