@@ -3,7 +3,7 @@ Kafka producer wrapper for the Finder project.
 """
 import json
 from typing import Dict, Any, Optional
-from confluent_kafka import Producer, KafkaError
+from aiokafka import AIOKafkaProducer
 
 from .kafka_config import KafkaConfig, get_kafka_config
 from ..logger_config import setup_logger
@@ -17,9 +17,37 @@ class KafkaProducer:
     def __init__(self, config: Optional[KafkaConfig] = None):
         """Initialize Kafka producer."""
         self.config = config or get_kafka_config()
-        self.producer = Producer(self.config.producer_config)
         
-    def produce_message(self, topic: str, message: Dict[str, Any], key: Optional[str] = None) -> None:
+        # Convert confluent-kafka config keys to aiokafka format
+        aiokafka_config = self._convert_config(self.config.producer_config)
+        
+        self.producer = AIOKafkaProducer(**aiokafka_config)
+        
+    def _convert_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert confluent-kafka config keys to aiokafka format."""
+        config_mapping = {
+            'bootstrap.servers': 'bootstrap_servers',
+            'client.id': 'client_id',
+            'acks': 'acks',
+            'retries': 'retries',
+            'retry.backoff.ms': 'retry_backoff_ms',
+            'compression.type': 'compression_type',
+            'batch.size': 'batch_size',
+            'linger.ms': 'linger_ms',
+        }
+        
+        converted = {}
+        for old_key, new_key in config_mapping.items():
+            if old_key in config:
+                converted[new_key] = config[old_key]
+        
+        return converted
+    
+    async def start(self):
+        """Start the producer."""
+        await self.producer.start()
+        
+    async def produce_message(self, topic: str, message: Dict[str, Any], key: Optional[str] = None) -> None:
         """
         Produce a message to a Kafka topic.
         
@@ -29,36 +57,31 @@ class KafkaProducer:
             key: Optional message key for partitioning
         """
         try:
+            # Ensure producer is started
+            if not self.producer._sender.sender_task:
+                await self.start()
+            
             # Serialize message to JSON
             message_bytes = json.dumps(message).encode('utf-8')
             key_bytes = key.encode('utf-8') if key else None
             
             # Produce message
-            self.producer.produce(
+            record_metadata = await self.producer.send_and_wait(
                 topic=topic,
                 value=message_bytes,
-                key=key_bytes,
-                callback=self._delivery_callback
+                key=key_bytes
             )
             
-            # Trigger delivery callbacks
-            self.producer.poll(0)
+            logger.debug(f"Message delivered to {record_metadata.topic} [{record_metadata.partition}] at offset {record_metadata.offset}")
             
         except Exception as e:
             logger.error(f"Error producing message to topic {topic}: {e}")
             raise
     
-    def _delivery_callback(self, err: Optional[KafkaError], msg) -> None:
-        """Callback for message delivery confirmation."""
-        if err:
-            logger.error(f"Message delivery failed: {err}")
-        else:
-            logger.debug(f"Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
-    
-    def flush(self, timeout: float = 10.0) -> None:
+    async def flush(self, timeout: float = 10.0) -> None:
         """Wait for all messages to be delivered."""
-        self.producer.flush(timeout)
+        await self.producer.flush(timeout=timeout)
     
-    def close(self) -> None:
+    async def close(self) -> None:
         """Close the producer."""
-        self.producer.flush() 
+        await self.producer.stop() 

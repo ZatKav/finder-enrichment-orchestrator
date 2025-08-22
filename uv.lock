@@ -3,6 +3,25 @@ revision = 2
 requires-python = "==3.12.5"
 
 [[package]]
+name = "aiokafka"
+version = "0.12.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "async-timeout" },
+    { name = "packaging" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/ca/42a962033e6a7926dcb789168bce81d0181ef4ddabce454d830b7e62370e/aiokafka-0.12.0.tar.gz", hash = "sha256:62423895b866f95b5ed8d88335295a37cc5403af64cb7cb0e234f88adc2dff94", size = 564955, upload-time = "2024-10-26T20:53:11.227Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/53/d4/baf1b2389995c6c312834792329a1993a303ff703ac023250ff977c5923b/aiokafka-0.12.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:b01947553ff1120fa1cb1a05f2c3e5aa47a5378c720bafd09e6630ba18af02aa", size = 375031, upload-time = "2024-10-26T20:52:40.104Z" },
+    { url = "https://files.pythonhosted.org/packages/54/ac/653070a4add8beea7aa8209ab396de87c7b4f9628fff15efcdbaea40e973/aiokafka-0.12.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:e3c8ec1c0606fa645462c7353dc3e4119cade20c4656efa2031682ffaad361c0", size = 370619, upload-time = "2024-10-26T20:52:41.877Z" },
+    { url = "https://files.pythonhosted.org/packages/80/f2/0ddaaa11876ab78e0f3b30f272c62eea70870e1a52a5afe985c7c1d098e1/aiokafka-0.12.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:577c1c48b240e9eba57b3d2d806fb3d023a575334fc3953f063179170cc8964f", size = 1192363, upload-time = "2024-10-26T20:52:44.028Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/48/541ccece0e593e24ee371dec0c33c23718bc010b04e998693e4c19091258/aiokafka-0.12.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d7b815b2e5fed9912f1231be6196547a367b9eb3380b487ff5942f0c73a3fb5c", size = 1213231, upload-time = "2024-10-26T20:52:46.028Z" },
+    { url = "https://files.pythonhosted.org/packages/99/3f/75bd0faa77dfecce34dd1c0edd317b608518b096809736f9987dd61f4cec/aiokafka-0.12.0-cp312-cp312-win32.whl", hash = "sha256:5a907abcdf02430df0829ac80f25b8bb849630300fa01365c76e0ae49306f512", size = 347752, upload-time = "2024-10-26T20:52:47.327Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/97/e2513a0c10585e51d4d9b42c9dd5f5ab15dfe150620a4893a2c6c20f0f4a/aiokafka-0.12.0-cp312-cp312-win_amd64.whl", hash = "sha256:fdbd69ec70eea4a8dfaa5c35ff4852e90e1277fcc426b9380f0b499b77f13b16", size = 366068, upload-time = "2024-10-26T20:52:49.132Z" },
+]
+
+[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -23,6 +42,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f1/b4/636b3b65173d3ce9a38ef5f0522789614e590dab6a8d505340a4efe4c567/anyio-4.10.0.tar.gz", hash = "sha256:3f3fae35c96039744587aa5b8371e7e8e603c0702999535961dd336026973ba6", size = 213252, upload-time = "2025-08-04T08:54:26.451Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6f/12/e5e0282d673bb9746bacfb6e2dba8719989d3660cdb2ea79aee9a9651afb/anyio-4.10.0-py3-none-any.whl", hash = "sha256:60e474ac86736bbfd6f210f7a61218939c318f43f9972497381f1c5e930ed3d1", size = 107213, upload-time = "2025-08-04T08:54:24.882Z" },
+]
+
+[[package]]
+name = "async-timeout"
+version = "5.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a5/ae/136395dfbfe00dfc94da3f3e136d0b13f394cba8f4841120e34226265780/async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3", size = 9274, upload-time = "2024-11-06T16:41:39.6Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/ba/e2081de779ca30d473f21f5b30e0e737c438205440784c7dfc81efc2b029/async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c", size = 6233, upload-time = "2024-11-06T16:41:37.9Z" },
 ]
 
 [[package]]
@@ -114,19 +142,6 @@ wheels = [
 ]
 
 [[package]]
-name = "confluent-kafka"
-version = "2.3.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/82/f5/2dd545316e143f1707f8f9abfbb770bcd2a0046a32922ca146852dd5e266/confluent-kafka-2.3.0.tar.gz", hash = "sha256:4069e7b56e0baf9db18c053a605213f0ab2d8f23715dca7b3bd97108df446ced", size = 134602, upload-time = "2023-10-25T18:41:58.044Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1c/f0/7252358fb1b15be4b41241842b90238d16077fcd98b0e49215631c6fdee0/confluent_kafka-2.3.0-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:6b46ce75bda0c092da103dbd55cb0ba429c73c232e70b476b19a0ab247ec9057", size = 3352296, upload-time = "2023-10-25T18:38:00.502Z" },
-    { url = "https://files.pythonhosted.org/packages/ca/3d/c38853eb9b1b04128ad54771dc425ee08c2f3f2d327571b583247e666efc/confluent_kafka-2.3.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:af60af786a7b8cbeafea51a9416664b96b0f5ef6243172b0bc59e5f75e8bd86a", size = 2868148, upload-time = "2023-10-25T18:38:07.112Z" },
-    { url = "https://files.pythonhosted.org/packages/c3/37/bfc66b4ee67cd10d7c30bfd4ea3611085d3c683e29f1087d93f3f591c626/confluent_kafka-2.3.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e08b601e09a584c6a4a8c323a71e92fca31a8826ed33b5b95b26783b7a996026", size = 4036354, upload-time = "2023-10-25T18:38:12.818Z" },
-    { url = "https://files.pythonhosted.org/packages/14/b8/9179afff00df6a5716d8f71730c7de4391832113d53444db42e5fbabc873/confluent_kafka-2.3.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:7fd1ab257d4fa0e2a98529e4eb2102cf8352ad6b3d22110d6cf0bb1f598893d9", size = 14123225, upload-time = "2023-10-25T18:38:30.427Z" },
-    { url = "https://files.pythonhosted.org/packages/60/e4/e234db242139e81019b3d33355f6022f1e9d3fa03ecc2b62ebc1c00a8dbf/confluent_kafka-2.3.0-cp312-cp312-win_amd64.whl", hash = "sha256:1ccf6483d86535627cad7b94982ea95d9fa9ae04ddb552e097c1211ffcde5ea7", size = 3445257, upload-time = "2023-10-25T18:38:37.471Z" },
-]
-
-[[package]]
 name = "coverage"
 version = "7.10.4"
 source = { registry = "https://pypi.org/simple" }
@@ -215,12 +230,11 @@ name = "finder-enrichment"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "confluent-kafka" },
+    { name = "aiokafka" },
     { name = "fastapi" },
     { name = "finder-enrichment-ai-client" },
     { name = "finder-enrichment-db-client" },
     { name = "finder-enrichment-db-contracts" },
-    { name = "kafka-python" },
     { name = "listings-db-api-client" },
     { name = "listings-db-contracts" },
     { name = "pandas" },
@@ -250,8 +264,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiokafka", specifier = ">=0.12.0" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=22.0" },
-    { name = "confluent-kafka", specifier = "==2.3.0" },
     { name = "fastapi" },
     { name = "finder-enrichment-ai-client", specifier = ">=0.1.1" },
     { name = "finder-enrichment-db-client", specifier = ">=0.1.5" },
@@ -259,7 +273,6 @@ requires-dist = [
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "httpx", marker = "extra == 'dev'" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=5.0" },
-    { name = "kafka-python", specifier = "==2.0.2" },
     { name = "listings-db-api-client", specifier = ">=1.0.5" },
     { name = "listings-db-contracts", specifier = ">=1.0.4" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
@@ -463,15 +476,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7b/6f/357efd7602486741aa73ffc0617fb310a29b588ed0fd69c2399acbb85b0c/jeepney-0.9.0.tar.gz", hash = "sha256:cf0e9e845622b81e4a28df94c40345400256ec608d0e55bb8a3feaa9163f5732", size = 106758, upload-time = "2025-02-27T18:51:01.684Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b2/a3/e137168c9c44d18eff0376253da9f1e9234d0239e0ee230d2fee6cea8e55/jeepney-0.9.0-py3-none-any.whl", hash = "sha256:97e5714520c16fc0a45695e5365a2e11b81ea79bba796e26f9f1d178cb182683", size = 49010, upload-time = "2025-02-27T18:51:00.104Z" },
-]
-
-[[package]]
-name = "kafka-python"
-version = "2.0.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/07/4c/2595fb5733c3ac01aef3dacce17ff07f7f3336d9f96548bcf723b9073e5c/kafka-python-2.0.2.tar.gz", hash = "sha256:04dfe7fea2b63726cd6f3e79a2d86e709d608d74406638c5da33a01d45a9d7e3", size = 265053, upload-time = "2020-09-30T07:24:03.287Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/75/68/dcb0db055309f680ab2931a3eeb22d865604b638acf8c914bedf4c1a0c8c/kafka_python-2.0.2-py2.py3-none-any.whl", hash = "sha256:2d92418c7cb1c298fa6c7f0fb3519b520d0d7526ac6cb7ae2a4fc65a51a94b6e", size = 246508, upload-time = "2020-09-30T07:24:01.49Z" },
 ]
 
 [[package]]

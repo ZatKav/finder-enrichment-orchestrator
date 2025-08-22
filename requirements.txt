@@ -24,7 +24,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   pytest
     #   tqdm
     #   uvicorn
-confluent-kafka==2.3.0
+aiokafka==0.12.0
     # via finder-enrichment
 deprecated==1.2.18
     # via limits
@@ -92,7 +92,7 @@ idna==3.10
     #   requests
 iniconfig==2.1.0
     # via pytest
-kafka-python==2.0.2
+aiokafka==0.12.0
     # via finder-enrichment
 limits==5.5.0
     # via slowapi
