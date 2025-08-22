@@ -8,9 +8,6 @@ from dotenv import load_dotenv
 
 from finder_enrichment.agentic_services.base_agent import BaseAgent
 from finder_enrichment.agentic_services.agent_config import AgentConfig
-from finder_enrichment.agentic_services.agent_interaction import AgentInteraction
-import google.generativeai as genai
-
 from finder_enrichment.agentic_services.model_response import ModelResponse
 from finder_enrichment.logger_config import setup_logger
 
@@ -20,7 +17,7 @@ load_dotenv()
 
 
 class DescriptionAnalyserAgent(BaseAgent):
-    """Agent responsible for searching and curating property listings."""
+    """Agent responsible for analyzing property descriptions."""
     
     def __init__(self):
         config = AgentConfig()
@@ -65,12 +62,16 @@ class DescriptionAnalyserAgent(BaseAgent):
 
                 response = self.client.generate_content(
                     prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=self.config.temperature,
-                        max_output_tokens=self.config.max_tokens,
-                    )
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens
                 )
-                content = response.text
+                
+                if response.get("success"):
+                    content = response["text"]
+                else:
+                    error_msg = response.get("error", "Unknown error")
+                    logger.error(f"AI client error: {error_msg}")
+                    raise Exception(f"AI client error: {error_msg}")
             
             processing_time = time.time() - start_time
             

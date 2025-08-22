@@ -11,7 +11,6 @@ from listings_db_contracts.schemas import Image
 from finder_enrichment.agentic_services.base_agent import BaseAgent
 from finder_enrichment.agentic_services.agent_config import AgentConfig
 from finder_enrichment.agentic_services.agent_interaction import AgentInteraction
-import google.generativeai as genai
 
 from finder_enrichment.agentic_services.model_response import ModelResponse
 from finder_enrichment.logger_config import setup_logger
@@ -22,7 +21,7 @@ load_dotenv()
 
 
 class ImageAnalyserAgent(BaseAgent):
-    """Agent responsible for searching and curating property listings."""
+    """Agent responsible for analyzing property images."""
     
     def __init__(self):
         config = AgentConfig()
@@ -33,7 +32,7 @@ class ImageAnalyserAgent(BaseAgent):
 
     
     def run(self, image: Image) -> ModelResponse:
-        """AI agent summarises the description of a property into an agreed markdown format"""
+        """AI agent analyzes the image of a property into an agreed markdown format"""
         prompt_record: Prompt = self._load_agent_profile()
         if not prompt_record:
             logger.error(f"No prompt found for {self.agent_name}")
@@ -42,7 +41,7 @@ class ImageAnalyserAgent(BaseAgent):
         self.version = prompt_record.version
         self.agent_profile = prompt_record.prompt
 
-        prompt = f"{self.agent_profile}: \n\n {image.image_data}"
+        prompt = f"{self.agent_profile}"
         
         start_time = time.time()
         try:
@@ -52,14 +51,19 @@ class ImageAnalyserAgent(BaseAgent):
             else:
                 logger.info(f"🎭 MOCK MODE DISABLED for {self.agent_name} - calling AI endpoint")
 
-                response = self.client.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=self.config.temperature,
-                        max_output_tokens=self.config.max_tokens,
-                    )
+                # Use the dedicated analyze_image method for better image processing
+                response = self.client.analyze_image(
+                    image_data=image.image_data,
+                    prompt=prompt,
+                    image_content_type="image/webp"  # Default to webp, could be made configurable
                 )
-                content = response.text
+                
+                if response.get("success"):
+                    content = response["text"]
+                else:
+                    error_msg = response.get("error", "Unknown error")
+                    logger.error(f"AI client error: {error_msg}")
+                    raise Exception(f"AI client error: {error_msg}")
             
             processing_time = time.time() - start_time
             

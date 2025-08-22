@@ -60,7 +60,7 @@ server:  ## Run the Finder Enrichment API server on localhost:3100
 	@echo "🔧 Press Ctrl+C to stop the server"
 	$(LIBRDKAFKA_FLAGS) uv run python scripts/run_api_server.py
 
-test:  ## Test the API server (requires server to be running)
+test: install-dev  ## Test the API server (requires server to be running)
 	@echo "🧪 Testing API endpoints..."
 	$(LIBRDKAFKA_FLAGS) uv run pytest src/finder_enrichment/tests/test_description_analyser_api.py
 	$(LIBRDKAFKA_FLAGS) uv run pytest src/finder_enrichment/tests/test_image_analyser_api.py
@@ -84,3 +84,20 @@ requirements-all:
 	$(MAKE) requirements
 	$(MAKE) requirements-dev
 	@echo "All requirements files generated successfully."
+
+# ------------------------------------------------------------------------------
+# PyPI Publishing
+# ------------------------------------------------------------------------------
+
+.PHONY: build-client
+build-client:
+	@echo "🏗️ Building finder_enrichment_ai_client package..."
+	cd src/finder_enrichment_ai_client && uv pip install -e . && uv build
+	@echo "✅ Package built in src/finder_enrichment_ai_client/dist/"
+
+.PHONY: publish-client
+publish-client: build-client
+	@echo "🧪 Publishing finder_enrichment_ai_client to PyPI..."
+	@echo "📦 Uploading package to PyPI..."
+	@source .env && cd src/finder_enrichment_ai_client && TWINE_USERNAME=__token__ TWINE_PASSWORD=$$PYPI_TOKEN uv run twine upload dist/*
+	@echo "✅ Package published to PyPI successfully!"

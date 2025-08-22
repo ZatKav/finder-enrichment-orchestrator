@@ -8,8 +8,6 @@ from finder_enrichment.agentic_services.agent_config import AgentConfig
 from finder_enrichment.agentic_services.agent_interaction import AgentInteraction
 from finder_enrichment_db_client.finder_enrichment_db_api_client import FinderEnrichmentDBAPIClient
 from finder_enrichment_db_contracts.schemas import Prompt
-import google.generativeai as genai
-from google.generativeai.types import GenerationConfig
 
 from finder_enrichment.logger_config import setup_logger
 
@@ -69,12 +67,12 @@ class BaseAgent(ABC):
         logger.debug(f"⏱️  Processing time: {processing_time:.2f}s")
         logger.debug(f"📊 Estimated tokens: {interaction.token_count_estimate}")
         
-    def _load_generation_config(self) -> GenerationConfig:
-        """Load generation config from config."""
-        return genai.types.GenerationConfig(
-            temperature=self.config.temperature,
-            max_output_tokens=self.config.max_tokens,
-        )
+    def _load_generation_config(self) -> dict:
+        """Load generation config for the new client interface."""
+        return {
+            "temperature": self.config.temperature,
+            "max_tokens": self.config.max_tokens,
+        }
     
     def _mock_generate_response(self, prompt: str) -> str:
         """Mock response that returns the input prompt instead of calling AI endpoint."""

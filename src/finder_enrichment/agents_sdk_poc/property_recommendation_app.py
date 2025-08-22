@@ -19,7 +19,7 @@ import shutil
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from dotenv import load_dotenv
-import google.generativeai as genai
+from finder_enrichment_ai_client.finder_enrichment_ai_client import FinderEnrichmentGoogleAIClient
 from datetime import datetime
 
 # Add src to path for imports
@@ -99,15 +99,15 @@ class PerformanceMetrics:
 
 
 class AgentConfig:
-    """Configuration for Google Gemini agents."""
+    """Configuration for Google Gemini agents using lightweight HTTP client."""
     
     def __init__(self):
         self.api_key = os.getenv('GOOGLE_GEMINI_API_KEY')
         if not self.api_key:
             raise ValueError("GOOGLE_GEMINI_API_KEY not found in environment variables")
         
-        # Configure Gemini
-        genai.configure(api_key=self.api_key)
+        # Initialize lightweight HTTP client
+        self.client = FinderEnrichmentGoogleAIClient(api_key=self.api_key)
         
         # Use Gemini 1.5 Flash for fast, free responses
         self.model = "gemini-2.0-flash"
@@ -115,8 +115,8 @@ class AgentConfig:
         self.max_tokens = 100000
         
     def get_client(self):
-        """Get a properly configured Gemini client."""
-        return genai.GenerativeModel(self.model)
+        """Get a properly configured lightweight Google AI client."""
+        return self.client
 
 
 class PropertyDataManager:
@@ -238,16 +238,14 @@ class CustomerProfilerAgent:
         try:
             response = self.client.generate_content(
                 prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=self.config.temperature,
-                    max_output_tokens=self.config.max_tokens,
-                )
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens
             )
             
             processing_time = time.time() - start_time
             
             # Parse JSON response
-            content = response.text
+            content = response["text"]
             # Clean up potential markdown formatting
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0]
@@ -311,16 +309,14 @@ class CustomerProfilerAgent:
         try:
             response = self.client.generate_content(
                 prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=self.config.temperature,
-                    max_output_tokens=self.config.max_tokens,
-                )
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens
             )
             
             processing_time = time.time() - start_time
             
             # Parse response and create PropertyRecommendation objects
-            content = response.text
+            content = response["text"]
             # Clean up potential markdown formatting
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0]
@@ -458,16 +454,14 @@ class ListingsCuratorAgent:
         try:
             response = self.client.generate_content(
                 prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=self.config.temperature,
-                    max_output_tokens=self.config.max_tokens,
-                )
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens
             )
             
             processing_time = time.time() - start_time
             
             # Parse response
-            content = response.text
+            content = response["text"]
             # Clean up potential markdown formatting
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0]
