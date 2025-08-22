@@ -62,10 +62,13 @@ except ImportError as e:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    
+
     logger.info("Starting Finder Enrichment API server...")
-    
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(f"Python path: {sys.path}")
+
     # Check if required modules were imported successfully
+    logger.info(f"Modules imported successfully: {modules_imported}")
     if not modules_imported:
         error_msg = "Required modules failed to import - check import dependencies"
         logger.error(error_msg)
@@ -76,19 +79,22 @@ async def lifespan(app: FastAPI):
             "details": "One or more required Python modules could not be imported"
         }
         g.orchestrator = None
+        logger.error(f"Orchestrator initialization failed due to import errors. Error details: {g.orchestrator_error}")
         yield
         return
-    
+
     # Validate required environment variables
     required_env_vars = [
         "LISTINGS_DB_BASE_URL",
-        "LISTINGS_DB_API_KEY", 
+        "LISTINGS_DB_API_KEY",
         "ENRICHED_DB_BASE_URL",
         "ENRICHMENT_DB_API_KEY",
         "GOOGLE_GEMINI_API_KEY"
     ]
-    
+
     missing_env_vars = [var for var in required_env_vars if not os.getenv(var)]
+    logger.info(f"Missing environment variables: {missing_env_vars}")
+
     if missing_env_vars:
         error_msg = f"Missing required environment variables: {missing_env_vars}"
         logger.error(error_msg)
@@ -99,6 +105,7 @@ async def lifespan(app: FastAPI):
             "missing_variables": missing_env_vars
         }
         g.orchestrator = None
+        logger.error(f"Orchestrator initialization failed due to missing environment variables. Error details: {g.orchestrator_error}")
         yield
         return
     
@@ -111,7 +118,7 @@ async def lifespan(app: FastAPI):
             batch_size=50
         )
         logger.info("DatabaseEnrichmentOrchestrator created successfully")
-        
+
         # Setup service clients
         listings_db_url = os.getenv("LISTINGS_DB_BASE_URL", "http://localhost:8000/api")
         enriched_db_url = os.getenv("ENRICHED_DB_BASE_URL", "http://localhost:8200")
@@ -127,9 +134,9 @@ async def lifespan(app: FastAPI):
             )
             logger.info("ListingsDBAPIClient created successfully")
         except Exception as e:
-            logger.error(f"Failed to create ListingsDBAPIClient: {e}")
+            logger.error(f"Failed to create ListingsDBAPIClient: {e}", exc_info=True)
             raise RuntimeError(f"ListingsDBAPIClient creation failed: {e}")
-        
+
         logger.info("Creating FinderEnrichmentDBAPIClient...")
         try:
             enriched_db_client = FinderEnrichmentDBAPIClient(
@@ -138,16 +145,16 @@ async def lifespan(app: FastAPI):
             )
             logger.info("FinderEnrichmentDBAPIClient created successfully")
         except Exception as e:
-            logger.error(f"Failed to create FinderEnrichmentDBAPIClient: {e}")
+            logger.error(f"Failed to create FinderEnrichmentDBAPIClient: {e}", exc_info=True)
             raise RuntimeError(f"FinderEnrichmentDBAPIClient creation failed: {e}")
-        
+
         # Initialize description analyser
         logger.info("Initializing DescriptionAnalyserAgent...")
         try:
             description_analyser = DescriptionAnalyserAgent()
             logger.info("DescriptionAnalyserAgent initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize DescriptionAnalyserAgent: {e}")
+            logger.error(f"Failed to initialize DescriptionAnalyserAgent: {e}", exc_info=True)
             raise RuntimeError(f"DescriptionAnalyserAgent initialization failed: {e}")
 
         # Initialize image analyser
@@ -156,9 +163,9 @@ async def lifespan(app: FastAPI):
             image_analyser = ImageAnalyserAgent()
             logger.info("ImageAnalyserAgent initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize ImageAnalyserAgent: {e}")
+            logger.error(f"Failed to initialize ImageAnalyserAgent: {e}", exc_info=True)
             raise RuntimeError(f"ImageAnalyserAgent initialization failed: {e}")
-        
+
         # Configure the orchestrator with service clients
         logger.info("Setting service clients on orchestrator...")
         try:
@@ -170,11 +177,11 @@ async def lifespan(app: FastAPI):
             )
             logger.info("Service clients set successfully on orchestrator")
         except Exception as e:
-            logger.error(f"Failed to set service clients on orchestrator: {e}")
+            logger.error(f"Failed to set service clients on orchestrator: {e}", exc_info=True)
             raise RuntimeError(f"Service client configuration failed: {e}")
-        
+
         logger.info("Orchestrator initialized successfully")
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize orchestrator: {e}", exc_info=True)
         # Store the error details for health check
@@ -184,9 +191,22 @@ async def lifespan(app: FastAPI):
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         g.orchestrator_error = error_details
-        logger.error(f"Stored orchestrator error details: {error_details}")
+        logger.error(f"Orchestrator initialization failed. Error details: {error_details}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Exception args: {e.args}")
+        logger.error(f"Exception traceback:", exc_info=True)
         g.orchestrator = None
-    
+
+    # Final check: if orchestrator is None but we don't have error details, something went wrong
+    if g.orchestrator is None and (not hasattr(g, 'orchestrator_error') or g.orchestrator_error is None):
+        logger.critical("CRITICAL: Orchestrator failed to initialize but no error details were captured!")
+        g.orchestrator_error = {
+            "error": "Orchestrator failed to initialize but no specific error was captured",
+            "error_type": "UnknownInitializationError",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        logger.error(f"Set fallback error details: {g.orchestrator_error}")
+
     yield
     
     logger.info("Shutting down Finder Enrichment API server...")
@@ -247,6 +267,46 @@ async def startup_check():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "message": "Application startup check completed"
     }
+
+
+@app.get("/debug/environment-summary")
+async def get_environment_summary():
+    """
+    Debug endpoint to log current environment variable state.
+    This will help identify missing environment variables.
+    """
+    required_env_vars = [
+        "LISTINGS_DB_BASE_URL",
+        "LISTINGS_DB_API_KEY",
+        "ENRICHED_DB_BASE_URL",
+        "ENRICHMENT_DB_API_KEY",
+        "GOOGLE_GEMINI_API_KEY"
+    ]
+
+    env_summary = {}
+    missing_vars = []
+
+    for var in required_env_vars:
+        value = os.getenv(var)
+        is_set = value is not None and value.strip() != ""
+        env_summary[var] = {
+            "configured": is_set,
+            "value_preview": "***configured***" if is_set else None,
+            "length": len(value) if value else 0
+        }
+        if not is_set:
+            missing_vars.append(var)
+
+    logger.error(f"Environment summary check - Missing variables: {missing_vars}")
+    logger.error(f"Environment summary check - Configured variables: {env_summary}")
+
+    return {
+        "environment_summary": env_summary,
+        "missing_variables": missing_vars,
+        "all_configured": len(missing_vars) == 0,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
 
 @app.get("/jobs")
 async def get_all_jobs():

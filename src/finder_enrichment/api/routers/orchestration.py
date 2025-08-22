@@ -129,13 +129,16 @@ async def get_orchestrator_error():
     Returns:
         Current orchestrator error details
     """
-    return {
+    logger.info("Debug endpoint called: /debug/orchestrator-error")
+    result = {
         "has_orchestrator": g.orchestrator is not None,
         "has_orchestrator_error_attr": hasattr(g, 'orchestrator_error'),
         "orchestrator_error_value": g.orchestrator_error if hasattr(g, 'orchestrator_error') else "ATTRIBUTE_NOT_FOUND",
         "orchestrator_error_is_none": g.orchestrator_error is None if hasattr(g, 'orchestrator_error') else "ATTRIBUTE_NOT_FOUND",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+    logger.info(f"Debug endpoint result: {result}")
+    return result
     
 
 @router.post("/run_database_orchestrator", response_model=OrchestrationJobResponse)
