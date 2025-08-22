@@ -23,7 +23,7 @@ async def test_orchestrator_connection():
         return {
             "status": "error",
             "message": "Orchestrator not initialized",
-            "error_details": g.orchestrator_error if hasattr(g, 'orchestrator_error') and g.orchestrator_error else None
+            "error_details": g.orchestrator_error if hasattr(g, 'orchestrator_error') else None
         }
     
     test_results = {}
@@ -118,6 +118,22 @@ async def test_orchestrator_connection():
         "status": "success" if all_tests_passed else "partial_failure",
         "message": "All service connections successful" if all_tests_passed else "Some service connections failed",
         "test_results": test_results,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@router.get("/debug/orchestrator-error")
+async def get_orchestrator_error():
+    """
+    Debug endpoint to check the current orchestrator error state.
+
+    Returns:
+        Current orchestrator error details
+    """
+    return {
+        "has_orchestrator": g.orchestrator is not None,
+        "has_orchestrator_error_attr": hasattr(g, 'orchestrator_error'),
+        "orchestrator_error_value": g.orchestrator_error if hasattr(g, 'orchestrator_error') else "ATTRIBUTE_NOT_FOUND",
+        "orchestrator_error_is_none": g.orchestrator_error is None if hasattr(g, 'orchestrator_error') else "ATTRIBUTE_NOT_FOUND",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
     

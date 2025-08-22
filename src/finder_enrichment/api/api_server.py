@@ -178,11 +178,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize orchestrator: {e}", exc_info=True)
         # Store the error details for health check
-        g.orchestrator_error = {
+        error_details = {
             "error": str(e),
             "error_type": type(e).__name__,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+        g.orchestrator_error = error_details
+        logger.error(f"Stored orchestrator error details: {error_details}")
         g.orchestrator = None
     
     yield
@@ -235,7 +237,7 @@ async def root():
 async def startup_check():
     """
     Basic startup check to verify the application can start up.
-    
+
     Returns:
         Basic startup status information
     """
@@ -245,7 +247,7 @@ async def startup_check():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "message": "Application startup check completed"
     }
-    
+
 @app.get("/jobs")
 async def get_all_jobs():
     """
