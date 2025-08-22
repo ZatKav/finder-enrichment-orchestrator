@@ -16,7 +16,7 @@ if vercel_working_dir == '/var/task':  # Vercel deployment
 
 from datetime import datetime, timezone
 import os
-from contextlib import asynccontextmanager
+
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -65,14 +65,9 @@ except ImportError as e:
     logger.error(f"Failed to import required modules: {e}")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-
-    logger.critical("🚀 CRITICAL: Lifespan function called! This confirms the app is starting up.")
-    logger.info("Starting Finder Enrichment API server...")
-    logger.info(f"Current working directory: {os.getcwd()}")
-    logger.info(f"Python path: {sys.path}")
+def initialize_orchestrator():
+    """Initialize the orchestrator immediately when the module is loaded."""
+    logger.critical("🚀 CRITICAL: Manual orchestrator initialization starting!")
 
     # Check if required modules were imported successfully
     logger.info(f"Modules imported successfully: {modules_imported}")
@@ -87,10 +82,9 @@ async def lifespan(app: FastAPI):
         }
         g.orchestrator = None
         logger.error(f"Orchestrator initialization failed due to import errors. Error details: {g.orchestrator_error}")
-        yield
         return
 
-    # Validate required environment variables
+        # Validate required environment variables
     required_env_vars = [
         "LISTINGS_DB_BASE_URL",
         "LISTINGS_DB_API_KEY",
@@ -113,7 +107,6 @@ async def lifespan(app: FastAPI):
         }
         g.orchestrator = None
         logger.error(f"Orchestrator initialization failed due to missing environment variables. Error details: {g.orchestrator_error}")
-        yield
         return
     
     # Initialize orchestrator and service clients
@@ -187,6 +180,7 @@ async def lifespan(app: FastAPI):
             logger.error(f"Failed to set service clients on orchestrator: {e}", exc_info=True)
             raise RuntimeError(f"Service client configuration failed: {e}")
 
+        logger.critical("🚀 CRITICAL: Orchestrator initialized successfully!")
         logger.info("Orchestrator initialized successfully")
 
     except Exception as e:
@@ -204,30 +198,21 @@ async def lifespan(app: FastAPI):
         logger.error(f"Exception traceback:", exc_info=True)
         g.orchestrator = None
 
-    # Final check: if orchestrator is None but we don't have error details, something went wrong
-    if g.orchestrator is None and (not hasattr(g, 'orchestrator_error') or g.orchestrator_error is None):
-        logger.critical("CRITICAL: Orchestrator failed to initialize but no error details were captured!")
-        g.orchestrator_error = {
-            "error": "Orchestrator failed to initialize but no specific error was captured",
-            "error_type": "UnknownInitializationError",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-        logger.error(f"Set fallback error details: {g.orchestrator_error}")
-
-    yield
-    
-    logger.info("Shutting down Finder Enrichment API server...")
-
 
 # Create FastAPI app
-logger.critical("🚀 CRITICAL: About to create FastAPI app with lifespan!")
+logger.critical("🚀 CRITICAL: About to create FastAPI app!")
 app = FastAPI(
     title="Finder Enrichment API",
     description="API for triggering property listing enrichment processes",
-    version="1.0.0",
-    lifespan=lifespan
+    version="1.0.0"
+    # Removed lifespan parameter - will initialize manually
 )
 logger.critical("🚀 CRITICAL: FastAPI app created successfully!")
+
+# Initialize orchestrator immediately after app creation
+logger.critical("🚀 CRITICAL: Calling manual orchestrator initialization!")
+initialize_orchestrator()
+logger.critical("🚀 CRITICAL: Manual orchestrator initialization completed!")
 
 # Setup rate limiting
 setup_rate_limiting(app)
@@ -257,11 +242,14 @@ else:
 async def root():
     """Root endpoint."""
     logger.critical("🚀 CRITICAL: Root endpoint called - app is definitely running!")
+    orchestrator_status = g.orchestrator is not None
+    logger.critical(f"🚀 CRITICAL: Orchestrator status: {'initialized' if orchestrator_status else 'not_initialized'}")
     return {
         "message": "Finder Enrichment API",
         "version": "1.0.0",
         "status": "running",
-        "lifespan_check": g.orchestrator is not None
+        "orchestrator_initialized": orchestrator_status,
+        "orchestrator_error": g.orchestrator_error if hasattr(g, 'orchestrator_error') and g.orchestrator_error else None
     }
     
 @app.get("/startup-check")
