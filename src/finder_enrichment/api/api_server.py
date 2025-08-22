@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
     required_env_vars = [
         "LISTINGS_DB_BASE_URL",
         "LISTINGS_DB_API_KEY",
-        "ENRICHED_DB_BASE_URL",
+        "ENRICHMENT_DB_BASE_URL",
         "ENRICHMENT_DB_API_KEY",
         "GOOGLE_GEMINI_API_KEY"
     ]
@@ -121,7 +121,7 @@ async def lifespan(app: FastAPI):
 
         # Setup service clients
         listings_db_url = os.getenv("LISTINGS_DB_BASE_URL", "http://localhost:8000/api")
-        enriched_db_url = os.getenv("ENRICHED_DB_BASE_URL", "http://localhost:8200")
+        enriched_db_url = os.getenv("ENRICHMENT_DB_BASE_URL", "http://localhost:8200")
 
         logger.info(f"Connecting to Listings DB at: {listings_db_url}")
         logger.info(f"Connecting to Enriched DB at: {enriched_db_url}")
@@ -278,7 +278,7 @@ async def get_environment_summary():
     required_env_vars = [
         "LISTINGS_DB_BASE_URL",
         "LISTINGS_DB_API_KEY",
-        "ENRICHED_DB_BASE_URL",
+        "ENRICHMENT_DB_BASE_URL",
         "ENRICHMENT_DB_API_KEY",
         "GOOGLE_GEMINI_API_KEY"
     ]
