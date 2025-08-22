@@ -41,6 +41,12 @@ load_dotenv()
 # Configure logging
 logger = setup_logger(__name__)
 
+# Immediate startup logging
+logger.critical("🚀 CRITICAL: api_server.py is being loaded and executed!")
+logger.critical(f"🚀 CRITICAL: Current working directory: {os.getcwd()}")
+logger.critical(f"🚀 CRITICAL: Python path: {sys.path}")
+logger.critical(f"🚀 CRITICAL: Environment variables loaded: {[k for k in os.environ.keys() if 'DB' in k or 'GEMINI' in k or 'DASHBOARD' in k]}")
+
 # Try to import orchestrator and agent modules with error handling
 try:
     from finder_enrichment.orchestrator.database_orchestrator import DatabaseEnrichmentOrchestrator
@@ -63,6 +69,7 @@ except ImportError as e:
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
 
+    logger.critical("🚀 CRITICAL: Lifespan function called! This confirms the app is starting up.")
     logger.info("Starting Finder Enrichment API server...")
     logger.info(f"Current working directory: {os.getcwd()}")
     logger.info(f"Python path: {sys.path}")
@@ -213,12 +220,14 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI app
+logger.critical("🚀 CRITICAL: About to create FastAPI app with lifespan!")
 app = FastAPI(
     title="Finder Enrichment API",
     description="API for triggering property listing enrichment processes",
     version="1.0.0",
     lifespan=lifespan
 )
+logger.critical("🚀 CRITICAL: FastAPI app created successfully!")
 
 # Setup rate limiting
 setup_rate_limiting(app)
@@ -247,10 +256,12 @@ else:
 @app.get("/")
 async def root():
     """Root endpoint."""
+    logger.critical("🚀 CRITICAL: Root endpoint called - app is definitely running!")
     return {
         "message": "Finder Enrichment API",
         "version": "1.0.0",
-        "status": "running"
+        "status": "running",
+        "lifespan_check": g.orchestrator is not None
     }
     
 @app.get("/startup-check")
@@ -399,7 +410,10 @@ async def health_check():
    
 if __name__ == "__main__":
     import uvicorn
-    
+
+    logger.critical("🚀 CRITICAL: Main execution block reached!")
+    logger.critical("🚀 CRITICAL: About to start uvicorn server!")
+
     logger.info("Starting Finder Enrichment API server on localhost:3100")
     uvicorn.run(
         "finder_enrichment.api.api_server:app",
