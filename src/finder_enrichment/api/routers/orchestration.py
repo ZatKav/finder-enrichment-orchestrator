@@ -11,6 +11,116 @@ from finder_enrichment.logger_config import setup_logger
 router = APIRouter()
 logger = setup_logger(__name__)
 
+@router.get("/orchestrator/test-connection")
+async def test_orchestrator_connection():
+    """
+    Test that the orchestrator can actually connect to and communicate with external services.
+    
+    Returns:
+        Connection test results for each service
+    """
+    if not g.orchestrator:
+        return {
+            "status": "error",
+            "message": "Orchestrator not initialized",
+            "error_details": g.orchestrator_error if hasattr(g, 'orchestrator_error') and g.orchestrator_error else None
+        }
+    
+    test_results = {}
+    
+    # Test listings DB connection through orchestrator
+    try:
+        if g.orchestrator.listings_db_client:
+            # Try to fetch a single listing
+            test_listing = g.orchestrator.listings_db_client.get_listings(limit=1)
+            test_results["listings_db"] = {
+                "status": "connected",
+                "test_result": f"Successfully fetched {len(test_listing) if test_listing else 0} listings"
+            }
+        else:
+            test_results["listings_db"] = {
+                "status": "not_configured",
+                "test_result": "Listings DB client not configured"
+            }
+    except Exception as e:
+        test_results["listings_db"] = {
+            "status": "connection_failed",
+            "test_result": f"Failed to connect: {str(e)}",
+            "error_type": type(e).__name__
+        }
+    
+    # Test enriched DB connection through orchestrator
+    try:
+        if g.orchestrator.enriched_db_client:
+            # Try to fetch estate agents
+            test_agents = g.orchestrator.enriched_db_client.get_estate_agents(limit=1)
+            test_results["enriched_db"] = {
+                "status": "connected",
+                "test_result": f"Successfully fetched {len(test_agents) if test_agents else 0} estate agents"
+            }
+        else:
+            test_results["enriched_db"] = {
+                "status": "not_configured",
+                "test_result": "Enriched DB client not configured"
+            }
+    except Exception as e:
+        test_results["enriched_db"] = {
+            "status": "connection_failed",
+            "test_result": f"Failed to connect: {str(e)}",
+            "error_type": type(e).__name__
+        }
+    
+    # Test description analyser
+    try:
+        if g.orchestrator.description_analyser_agent:
+            test_results["description_analyser"] = {
+                "status": "available",
+                "test_result": "Description analyser agent is configured and available"
+            }
+        else:
+            test_results["description_analyser"] = {
+                "status": "not_configured",
+                "test_result": "Description analyser agent not configured"
+            }
+    except Exception as e:
+        test_results["description_analyser"] = {
+            "status": "error",
+            "test_result": f"Error testing description analyser: {str(e)}",
+            "error_type": type(e).__name__
+        }
+    
+    # Test image analyser
+    try:
+        if g.orchestrator.image_analyser_client:
+            test_results["image_analyser"] = {
+                "status": "available",
+                "test_result": "Image analyser agent is configured and available"
+            }
+        else:
+            test_results["image_analyser"] = {
+                "status": "not_configured",
+                "test_result": "Image analyser agent not configured"
+            }
+    except Exception as e:
+        test_results["image_analyser"] = {
+            "status": "error",
+            "test_result": f"Error testing image analyser: {str(e)}",
+            "error_type": type(e).__name__
+        }
+    
+    # Determine overall test status
+    all_tests_passed = all(
+        result["status"] in ["connected", "available"] 
+        for result in test_results.values()
+    )
+    
+    return {
+        "status": "success" if all_tests_passed else "partial_failure",
+        "message": "All service connections successful" if all_tests_passed else "Some service connections failed",
+        "test_results": test_results,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
 
 @router.post("/run_database_orchestrator", response_model=OrchestrationJobResponse)
 async def run_database_orchestrator(

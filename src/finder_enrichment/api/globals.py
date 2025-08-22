@@ -8,3 +8,6 @@ orchestrator: Optional[DatabaseEnrichmentOrchestrator] = None
 
 # Track running jobs
 running_jobs: Dict[str, Dict[str, Any]] = {}
+
+# Store orchestrator initialization error details
+orchestrator_error: Optional[Dict[str, Any]] = None
