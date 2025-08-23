@@ -26,7 +26,7 @@ class DescriptionAnalyser:
         self.error_count = 0
     
 
-    def run_single_listing(self, listing_id: int) -> DescriptionAnalyticsRun:
+    def run_single_listing(self, listing_id: int) -> DescriptionAnalyticsRun|bool:
         # 1. Fetch original listing data
         try:
             original_listing = self.listings_db_client.get_listing(listing_id=listing_id)

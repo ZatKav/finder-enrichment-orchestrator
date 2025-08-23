@@ -4,9 +4,14 @@ Database-based enrichment orchestrator that processes all listings from the data
 
 from typing import List, Optional
 
+from finder_enrichment_db_contracts import EnrichmentOrchestrationRun
 from listings_db_contracts.schemas import ApiResponse, Listing
 
 from finder_enrichment.orchestrator.base_orchestrator import BaseEnrichmentOrchestrator
+from finder_enrichment.orchestrator.exceptions import (
+    ListingNotFoundError, EstateAgentError, DescriptionAnalysisError, 
+    ImageAnalysisError, DatabaseError, EnrichmentError
+)
 from finder_enrichment.logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -50,8 +55,8 @@ class DatabaseEnrichmentOrchestrator(BaseEnrichmentOrchestrator):
 
         try:
             # 1. Setup - Create orchestration set
-            self._create_orchestration_set()
             self.is_running = True
+            self._create_orchestration_set()
             logger.info("Database enrichment orchestrator started")
 
             # 2. Fetch and process all listings
@@ -94,14 +99,17 @@ class DatabaseEnrichmentOrchestrator(BaseEnrichmentOrchestrator):
                 # Process each listing in the batch
                 for listing in listings:
                     try:
-                        success = self.process_single_listing(listing.id)
-                        if success:
-                            total_processed += 1
-                            logger.info(f"Successfully processed listing {listing.id} ({total_processed} total)")
-                        else:
-                            logger.warning(f"Failed to process listing {listing.id}")
+                        result = self.process_single_listing(listing.id)
+                        total_processed += 1
+                        logger.info(f"Successfully processed listing {listing.id} ({total_processed} total)")
+                    except (ListingNotFoundError, EstateAgentError, DescriptionAnalysisError, ImageAnalysisError) as e:
+                        logger.warning(f"Failed to process listing {listing.id}: {e}")
+                        self.error_count += 1
+                    except (DatabaseError, EnrichmentError) as e:
+                        logger.error(f"Critical error processing listing {listing.id}: {e}")
+                        self.error_count += 1
                     except Exception as e:
-                        logger.error(f"Error processing listing {listing.id}: {e}", exc_info=True)
+                        logger.error(f"Unexpected error processing listing {listing.id}: {e}", exc_info=True)
                         self.error_count += 1
 
                 # Update skip for next batch
@@ -124,35 +132,46 @@ class DatabaseEnrichmentOrchestrator(BaseEnrichmentOrchestrator):
             self.orchestration_set_id = None
             logger.info("Database enrichment orchestrator stopped.")
             
-    def process_listings_by_ids(self, listing_ids: List[str]) -> None:
+    
+    def process_listings_by_ids(self, listing_ids: List[str]) -> List[EnrichmentOrchestrationRun]:
         """
         Process specific listings by their IDs.
         
         Args:
             listing_ids: List of listing IDs to process
+            
+        Returns:
+            List of EnrichmentOrchestrationRun objects for successfully processed listings
         """
         if not self.enriched_db_client or not self.listings_db_client:
             raise RuntimeError("Both enriched DB client and listings DB client must be configured before starting.")
 
         try:
+            self.is_running = True
+
             # Setup - Create orchestration set
             self._create_orchestration_set()
-            self.is_running = True
             logger.info(f"Database enrichment orchestrator started for {len(listing_ids)} specific listings")
 
+            results = []
             # Process each listing
             for listing_id in listing_ids:
                 try:
-                    success = self.process_single_listing(listing_id)
-                    if success:
-                        logger.info(f"Successfully processed listing {listing_id}")
-                    else:
-                        logger.warning(f"Failed to process listing {listing_id}")
+                    result = self.process_single_listing(listing_id)
+                    results.append(result)
+                    logger.info(f"Successfully processed listing {listing_id}")
+                except (ListingNotFoundError, EstateAgentError, DescriptionAnalysisError, ImageAnalysisError) as e:
+                    logger.warning(f"Failed to process listing {listing_id}: {e}")
+                    self.error_count += 1
+                except (DatabaseError, EnrichmentError) as e:
+                    logger.error(f"Critical error processing listing {listing_id}: {e}")
+                    self.error_count += 1
                 except Exception as e:
-                    logger.error(f"Error processing listing {listing_id}: {e}", exc_info=True)
+                    logger.error(f"Unexpected error processing listing {listing_id}: {e}", exc_info=True)
                     self.error_count += 1
 
             logger.info(f"Completed processing {len(listing_ids)} specific listings")
+            return results
 
         except Exception as e:
             logger.error(f"Failed during specific listings enrichment processing: {e}", exc_info=True)

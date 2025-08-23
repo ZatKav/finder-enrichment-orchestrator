@@ -1,12 +1,17 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 import requests
 from pydantic import ValidationError
 
 from finder_enrichment.api.models import (
+    DescriptionAnalysisResult,
     OrchestrationJobResponse,
     OrchestrationJobStatus,
+    EnrichmentResult,
+    BatchEnrichmentResult,
+    BatchImageAnalysisResult,
+    ImageAnalysisResult,
 )
 
 
@@ -190,4 +195,106 @@ class OrchestratorAPIClient:
         # If we exit due to timeout, return the last observed status if any
         if last_status is not None:
             return last_status
-        raise TimeoutError(f"Timed out waiting for job {job_id} to complete") 
+        raise TimeoutError(f"Timed out waiting for job {job_id} to complete")
+
+    # ---- Synchronous Enrichment API ----
+
+    def enrich_listing(self, listing_id: str, *, timeout_seconds: Optional[float] = None) -> EnrichmentResult:
+        """
+        Enrich a single listing synchronously.
+
+        This method uses the new synchronous enrichment endpoint that processes
+        listings immediately without background jobs.
+
+        Args:
+            listing_id: The ID of the listing to enrich
+            timeout_seconds: Optional timeout for the request
+
+        Returns:
+            EnrichmentResult with the processing outcome
+
+        Raises:
+            ValueError: If the response schema is unexpected
+            requests.HTTPError: If the request fails
+        """
+        response = self._post(f"/enrich/listing/{listing_id}", timeout_seconds=timeout_seconds)
+        payload = self._ensure_ok(response)
+        try:
+            return EnrichmentResult(**payload)
+        except ValidationError as exc:
+            raise ValueError(f"Unexpected response schema: {exc}\nPayload: {payload}") from exc
+
+    def enrich_listings(self, listing_ids: List[str], *, timeout_seconds: Optional[float] = None) -> BatchEnrichmentResult:
+        """
+        Enrich multiple listings synchronously in a batch.
+
+        This method uses the new synchronous batch enrichment endpoint that processes
+        multiple listings immediately, continuing even if individual listings fail.
+
+        Args:
+            listing_ids: List of listing IDs to process
+            timeout_seconds: Optional timeout for the request
+
+        Returns:
+            BatchEnrichmentResult with results for all processed listings
+
+        Raises:
+            ValueError: If the response schema is unexpected
+            requests.HTTPError: If the request fails
+        """
+        request_body = {"listing_ids": listing_ids}
+        response = self._post("/enrich/listings", json=request_body, timeout_seconds=timeout_seconds)
+        payload = self._ensure_ok(response)
+        try:
+            return BatchEnrichmentResult(**payload)
+        except ValidationError as exc:
+            raise ValueError(f"Unexpected response schema: {exc}\nPayload: {payload}") from exc 
+        
+    def enrich_description(self, listing_id: str, *, timeout_seconds: Optional[float] = None) -> DescriptionAnalysisResult:
+        """
+        Enrich a single listing synchronously.
+
+        This method uses the new synchronous enrichment endpoint that processes
+        listings immediately without background jobs.
+        """
+        response = self._post(f"/enrich/description/{listing_id}", timeout_seconds=timeout_seconds)
+        payload = self._ensure_ok(response)
+        try:
+            return DescriptionAnalysisResult(**payload)
+        except ValidationError as exc:
+            raise ValueError(f"Unexpected response schema: {exc}\nPayload: {payload}") from exc
+        
+    def enrich_listing_images(self, listing_id: str, *, timeout_seconds: Optional[float] = None) -> BatchImageAnalysisResult:
+        """
+        Enrich a single listing synchronously.
+
+        This method uses the new synchronous enrichment endpoint that processes
+        listings immediately without background jobs.
+        """
+        response = self._post(f"/enrich/listing/images/{listing_id}", timeout_seconds=timeout_seconds)
+        payload = self._ensure_ok(response)
+        try:
+            return BatchImageAnalysisResult(**payload)
+        except ValidationError as exc:
+            raise ValueError(f"Unexpected response schema: {exc}\nPayload: {payload}") from exc
+        
+    def enrich_image(self, image_id: str, *, timeout_seconds: Optional[float] = None) -> ImageAnalysisResult:
+        """
+        Enrich a single image synchronously.
+
+        This method uses the new synchronous enrichment endpoint that processes
+        images immediately without background jobs.
+        """
+        response = self._post(f"/enrich/image/{image_id}", timeout_seconds=timeout_seconds)
+        payload = self._ensure_ok(response)
+        try:
+            return ImageAnalysisResult(**payload)
+        except ValidationError as exc:
+            raise ValueError(f"Unexpected response schema: {exc}\nPayload: {payload}") from exc
+        
+    def enrichment_health(self) -> Dict[str, Any]:
+        """
+        Check the health of the enrichment service.
+        """
+        response = self._get("/enrich/health")
+        return self._ensure_ok(response)

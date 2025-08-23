@@ -23,9 +23,9 @@ load_dotenv()
 class ImageAnalyserAgent(BaseAgent):
     """Agent responsible for analyzing property images."""
     
-    def __init__(self):
+    def __init__(self, agent_name: str = "image_analyser"):
         config = AgentConfig()
-        agent_name = "image_analyser"
+        self.agent_name = agent_name
         super().__init__(config, agent_name)
         self.model = config.model
         self.mock_image_analyser = os.getenv('MOCK_IMAGE_ENDPOINT', 'false').lower() == 'true'

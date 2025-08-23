@@ -54,6 +54,8 @@ try:
     from finder_enrichment.api.routers.orchestration import router as orchestration_router
     from finder_enrichment.api.routers.description_analyser import router as description_analyser_router
     from finder_enrichment.api.routers.image_analyser import router as image_analyser_router
+    from finder_enrichment.api.routers.enrichment import router as enrichment_router
+    from finder_enrichment.services.synchronous_enrichment_service import SynchronousEnrichmentService
     import finder_enrichment.api.globals as g
     
     modules_imported = True
@@ -232,6 +234,7 @@ if modules_imported:
     app.include_router(orchestration_router, prefix="/api", tags=["orchestration"])
     app.include_router(description_analyser_router, prefix="/api", tags=["description_analyser"])
     app.include_router(image_analyser_router, prefix="/api", tags=["image_analyser"])
+    app.include_router(enrichment_router, prefix="/api", tags=["enrichment"])
     logger.info("All API routers included successfully")
 else:
     logger.warning("Skipping router inclusion due to import failures")
@@ -294,7 +297,7 @@ async def health_check():
                 "listings_db_client": g.orchestrator.listings_db_client is not None,
                 "enriched_db_client": g.orchestrator.enriched_db_client is not None,
                 "description_analyser_agent": g.orchestrator.description_analyser_agent is not None,
-                "image_analyser_client": g.orchestrator.image_analyser_client is not None
+                "image_analyser_client": g.orchestrator.image_analyser_agent is not None
             }
         }
     else:

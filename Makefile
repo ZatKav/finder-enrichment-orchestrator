@@ -18,12 +18,12 @@ setup: ## Create virtual environment and install dependencies
 
 install: ## Install production dependencies using uv
 	@echo "📦 Installing production dependencies with uv..."
-	$(LIBRDKAFKA_FLAGS) uv sync --python .venv/bin/python
+	uv sync --python .venv/bin/python
 	@echo "✅ Production dependencies installed!"
 
 install-dev: ## Install development dependencies using uv
 	@echo "📦 Installing development dependencies with uv..."
-	$(LIBRDKAFKA_FLAGS) uv sync --python .venv/bin/python --extra dev
+	uv sync --python .venv/bin/python --extra dev
 	@echo "✅ Development dependencies installed!"
 
 uv-cache-clean:  ## Clear uv cache
@@ -31,40 +31,77 @@ uv-cache-clean:  ## Clear uv cache
 	uv cache clean
 	@echo "✅ uv cache cleared successfully!"
 
-# Kafka Scripts
-SCRIPTS_DIR = src/finder_enrichment/kafka/scripts
-
-setup-kafka:  ## Sets up the required Kafka topics.
-	@echo "Setting up Kafka topics..."
-	$(LIBRDKAFKA_FLAGS) uv run python -m src.finder_enrichment.kafka.scripts.setup_kafka
-
-setup-kafka-ui:  ## Starts the Kafka UI.
-	@echo "Starting Kafka UI..."
-	$(LIBRDKAFKA_FLAGS) uv run python -m src.finder_enrichment.kafka.scripts.setup_kafka_ui
-
-reprocess-listings:  ## Fetches all listings and sends them to Kafka.
-	@echo "Reprocessing all listings and sending to Kafka..."
-	$(LIBRDKAFKA_FLAGS) uv run python -m src.finder_enrichment.kafka.scripts.reprocess_listings
-
-flush-kafka:  ## Flushes all messages from Kafka topics.
-	@echo "Flushing Kafka topics..."
-	$(LIBRDKAFKA_FLAGS) uv run python -m src.finder_enrichment.kafka.scripts.flush_kafka --all
-
-run-orchestrator:
-	$(LIBRDKAFKA_FLAGS) uv run python -m src.finder_enrichment
-
 # API Server
 server:  ## Run the Finder Enrichment API server on localhost:3100
 	@echo "🚀 Starting Finder Enrichment API server on localhost:3100..."
 	@echo "📖 API documentation will be available at: http://localhost:3100/docs"
 	@echo "🔧 Press Ctrl+C to stop the server"
-	$(LIBRDKAFKA_FLAGS) uv run python scripts/run_api_server.py
+	uv run python scripts/run_api_server.py
 
-test: install-dev  ## Test the API server (requires server to be running)
-	@echo "🧪 Testing API endpoints..."
-	$(LIBRDKAFKA_FLAGS) uv run pytest src/finder_enrichment/tests/test_description_analyser_api.py
-	$(LIBRDKAFKA_FLAGS) uv run pytest src/finder_enrichment/tests/test_image_analyser_api.py
-	$(LIBRDKAFKA_FLAGS) uv run pytest src/finder_enrichment/tests/test_auth.py
+# Test targets organized by category
+test: test-unit test-api test-integration  ## Run all tests (unit, API, and integration)
+
+test-unit: install-dev  ## Run unit tests (fast, no external dependencies)
+	@echo "🧪 Running unit tests..."
+	uv run pytest src/finder_enrichment/tests/test_synchronous_enrichment_service.py -v
+	uv run pytest src/finder_enrichment/tests/test_enrichment_models.py -v
+	uv run pytest src/finder_enrichment/tests/test_orchestrator_api_client.py -v
+
+test-api: install-dev  ## Run API tests (requires server running, mocks external services)
+	@echo "🧪 Running API tests..."
+	uv run pytest src/finder_enrichment/tests/test_enrichment_api.py -v
+
+test-integration: install-dev  ## Run integration tests (requires all external services)
+	@echo "🧪 Running integration tests..."
+	@echo "⚠️  Integration tests require running services and API keys"
+	@echo "   Run 'uv run python scripts/test_integration_setup.py' first to validate setup"
+	uv run pytest src/finder_enrichment/tests/test_description_analyser_api.py -v
+	uv run pytest src/finder_enrichment/tests/test_image_analyser_api.py -v
+	uv run pytest src/finder_enrichment/tests/test_auth.py -v
+	uv run pytest src/finder_enrichment/tests/test_synchronous_enrichment_api.py -v
+	uv run pytest src/finder_enrichment/tests/test_synchronous_orchestration_api.py -v
+	uv run pytest src/finder_enrichment/tests/test_individual_analysis_integration.py -v
+
+# Individual test targets for specific components
+test-sync-service: install-dev  ## Test synchronous enrichment service
+	uv run pytest src/finder_enrichment/tests/test_synchronous_enrichment_service.py -v
+
+test-sync-api: install-dev  ## Test synchronous enrichment API endpoints
+	uv run pytest src/finder_enrichment/tests/test_synchronous_enrichment_api.py -v
+
+test-sync-orchestration: install-dev  ## Test synchronous orchestration integration
+	uv run pytest src/finder_enrichment/tests/test_synchronous_orchestration_api.py -v
+
+test-models: install-dev  ## Test data models
+	uv run pytest src/finder_enrichment/tests/test_enrichment_models.py -v
+
+test-individual-analysis: install-dev  ## Test individual analysis endpoints (integration)
+	@echo "🧪 Running individual analysis integration tests..."
+	@echo "⚠️  These tests require running services and API keys"
+	uv run pytest src/finder_enrichment/tests/test_individual_analysis_integration.py -v
+
+# Quick test validation
+test-validate-setup: install-dev  ## Validate test environment setup
+	@echo "🔍 Validating test environment..."
+	uv run python scripts/test_integration_setup.py
+
+# Development test targets
+test-fast: install-dev  ## Run only fast unit tests (no integration)
+	@echo "⚡ Running fast unit tests only..."
+	uv run pytest src/finder_enrichment/tests/test_synchronous_enrichment_service.py -v
+	uv run pytest src/finder_enrichment/tests/test_enrichment_models.py -v
+	uv run pytest src/finder_enrichment/tests/test_orchestrator_api_client.py -v
+
+test-coverage: install-dev  ## Run tests with coverage report
+	@echo "📊 Running tests with coverage..."
+	uv run pytest src/finder_enrichment/tests/ --cov=src/finder_enrichment --cov-report=html --cov-report=term-missing
+
+test-synchronous: test-unit test-api  ## Test only synchronous enrichment components
+	@echo "🔄 Testing synchronous enrichment components..."
+	@echo "   Unit tests, API tests, and models"
+	$(MAKE) test-unit
+	$(MAKE) test-api
+	$(MAKE) test-models
 
 .PHONY: requirements
 requirements:

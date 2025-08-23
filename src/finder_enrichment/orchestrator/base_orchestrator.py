@@ -19,6 +19,7 @@ from finder_enrichment_db_client import FinderEnrichmentDBAPIClient
 from listings_db_api_client.listings_db_api_client import ListingsDBAPIClient
 from finder_enrichment_db_contracts import (
     DescriptionAnalyticsRunCreate,
+    EnrichmentOrchestrationRun,
     ImageAnalyticsRunCreate,
     EnrichmentOrchestrationSetCreate,
     EnrichmentOrchestrationRunCreate,
@@ -31,6 +32,10 @@ from finder_enrichment_db_contracts import (
 )
 
 from finder_enrichment.orchestrator.estate_agent_utils import get_or_create_estate_agent
+from finder_enrichment.orchestrator.exceptions import (
+    ListingNotFoundError, EstateAgentError, DescriptionAnalysisError, 
+    ImageAnalysisError, DatabaseError, ExternalServiceError
+)
 from finder_enrichment.logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -60,18 +65,16 @@ class BaseEnrichmentOrchestrator:
         self.enable_parallel_processing = enable_parallel_processing
         
         # Service clients - will be injected via dependency injection
-        self.listings_db_client: Optional[ListingsDBAPIClient] = None
-        self.description_analyser_agent: Optional[DescriptionAnalyserAgent] = None  
-        self.floorplan_analyser_client: Optional[BaseAgent] = None
-        self.image_analyser_client: Optional[ImageAnalyserAgent] = None
-        self.enriched_db_client: Optional[FinderEnrichmentDBAPIClient] = None
+        self.listings_db_client: ListingsDBAPIClient = ListingsDBAPIClient()
+        self.description_analyser_agent: DescriptionAnalyserAgent = DescriptionAnalyserAgent()
+        self.floorplan_analyser_agent: ImageAnalyserAgent = ImageAnalyserAgent("floorplan_analyser")
+        self.image_analyser_agent: ImageAnalyserAgent = ImageAnalyserAgent()
+        self.enriched_db_client: FinderEnrichmentDBAPIClient = FinderEnrichmentDBAPIClient()
         
         # Processing state
         self.is_running = False
         self.processed_count = 0
         self.error_count = 0
-        
-        # Orchestration state
         self.orchestration_set_id: Optional[int] = None
         
         # Enrichment handlers mapping
@@ -81,33 +84,8 @@ class BaseEnrichmentOrchestrator:
             "image_analysis": self._handle_image_analysis,
         }
         
-    def set_service_clients(
-        self,
-        listings_db_client=None,
-        description_analyser_client=None,
-        floorplan_analyser_client=None, 
-        image_analyser_client=None,
-        enriched_db_client=None
-    ):
-        """Inject service client dependencies."""
-        self.listings_db_client = listings_db_client
-        self.description_analyser_agent = description_analyser_client
-        self.floorplan_analyser_client = floorplan_analyser_client
-        self.image_analyser_client = image_analyser_client
-        self.enriched_db_client = enriched_db_client
-        
-    def _create_orchestration_set(self) -> int:
-        """Create a new orchestration set and return its ID."""
-        if not self.enriched_db_client:
-            raise RuntimeError("Enriched DB client must be configured before starting.")
-            
-        set_create = EnrichmentOrchestrationSetCreate(timestamp=datetime.now(timezone.utc))
-        orchestration_set = self.enriched_db_client.create_orchestration_set(set_create)
-        self.orchestration_set_id = orchestration_set.id
-        logger.info(f"Created orchestration set with ID: {self.orchestration_set_id}")
-        return self.orchestration_set_id
 
-    def process_single_listing(self, property_id: str) -> bool:
+    def process_single_listing(self, property_id: str) -> EnrichmentOrchestrationRun:
         """
         Process a single listing by its ID.
         
@@ -115,7 +93,14 @@ class BaseEnrichmentOrchestrator:
             property_id: The ID of the listing to process
             
         Returns:
-            True if processing was successful, False otherwise
+            EnrichmentOrchestrationRun if processing was successful
+            
+        Raises:
+            ListingNotFoundError: When the listing cannot be found
+            EstateAgentError: When estate agent processing fails
+            DescriptionAnalysisError: When description analysis fails
+            ImageAnalysisError: When image analysis fails
+            DatabaseError: When database operations fail
         """
         logger.info(f"Processing listing: {property_id}")
         
@@ -125,7 +110,7 @@ class BaseEnrichmentOrchestrator:
             
         except Exception as e:
             logger.error(f"Failed to fetch original listing {property_id}: {e}")
-            return False
+            raise ListingNotFoundError(f"Listing {property_id} not found or inaccessible: {str(e)}") from e
 
         # 2. Get or create Estate Agent in enriched DB
         try:
@@ -133,20 +118,29 @@ class BaseEnrichmentOrchestrator:
             
             enriched_estate_agent_id = get_or_create_estate_agent(original_agent)
             if not enriched_estate_agent_id:
-                logger.error(f"Could not get or create estate agent for listing {property_id}. Aborting processing for this listing.")
-                self.error_count += 1
-                return False
+                raise EstateAgentError(f"Could not get or create estate agent for listing {property_id}")
+        except EstateAgentError:
+            raise  # Re-raise our custom exception
         except Exception as e:
             logger.error(f"Failed to get or create estate agent for listing {property_id}: {e}", exc_info=True)
-            self.error_count += 1
-            return False
+            raise EstateAgentError(f"Estate agent processing failed for listing {property_id}: {str(e)}") from e
             
         # 3. Run all enrichments in sequence
-        description_analysis_model_response = self._handle_description_analysis(original_listing)
+        try:
+            description_analysis_model_response = self._handle_description_analysis(original_listing)
+        except Exception as e:
+            raise DescriptionAnalysisError(f"Description analysis failed for listing {property_id}: {str(e)}") from e
+            
         image_responses = None
         floorplan_responses = None
-        image_responses = self._handle_image_analysis(original_listing) if original_listing.images else None
-        # floorplan_responses = self._handle_floorplan_analysis(original_listing) if original_listing.floorplans else None
+        
+        if original_listing.images:
+            try:
+                image_responses = self._handle_image_analysis(original_listing)
+            except Exception as e:
+                raise ImageAnalysisError(f"Image analysis failed for listing {property_id}: {str(e)}") from e
+
+        #TODO: Add floorplan analysis
 
         # 4. Create Enriched Listing
         try:
@@ -161,29 +155,42 @@ class BaseEnrichmentOrchestrator:
             logger.info(f"Created enriched listing with ID: {enriched_listing.id}")
         except Exception as e:
             logger.error(f"Failed to create enriched listing for property {property_id}: {e}", exc_info=True)
-            enriched_listing = None
+            raise DatabaseError(f"Failed to create enriched listing for property {property_id}: {str(e)}") from e
 
-        if enriched_listing:
-            # 5. Create Orchestration Run Record
-            try:
-                orchestration_run_create = self._build_orchestration_run(
-                    original_listing, 
-                    enriched_listing.id,
-                    description_analysis_model_response,
-                    image_responses,
-                    floorplan_responses
-                )
-                self.enriched_db_client.create_orchestration_run(orchestration_run_create)
-                logger.info(f"Created orchestration run for original listing {property_id}")
-                self.processed_count += 1
-                return True
-            except Exception as e:
-                logger.error(f"Failed to create orchestration run for property {property_id}: {e}", exc_info=True)
-                self.error_count += 1
-                return False
-        
-        return False
+        # 5. Create Orchestration Run Record
+        try:
+            orchestration_run_create: EnrichmentOrchestrationRunCreate = self._build_orchestration_run(
+                original_listing=original_listing, 
+                enriched_listing_id=enriched_listing.id,
+                description_analysis_model_response=description_analysis_model_response,
+                image_responses=image_responses,
+                floorplan_responses=floorplan_responses
+            )
+            created_orchestration_run: EnrichmentOrchestrationRun = self.enriched_db_client.create_orchestration_run(orchestration_run_create)
+            logger.info(f"Created orchestration run for original listing {property_id}")
+            self.processed_count += 1
+            return created_orchestration_run
+        except Exception as e:
+            logger.error(f"Failed to create orchestration run for property {property_id}: {e}", exc_info=True)
+            raise DatabaseError(f"Failed to create orchestration run for property {property_id}: {str(e)}") from e
             
+            
+    def _create_orchestration_set(self) -> None:
+        """Create a new orchestration set for tracking this processing run."""
+        try:
+            orchestration_set_create = EnrichmentOrchestrationSetCreate(
+                name=f"enrichment_run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
+                description="Automated enrichment processing run",
+                created_at=datetime.now(timezone.utc)
+            )
+            created_set = self.enriched_db_client.create_orchestration_set(orchestration_set_create)
+            self.orchestration_set_id = created_set.id
+            logger.info(f"Created orchestration set with ID: {self.orchestration_set_id}")
+        except Exception as e:
+            logger.error(f"Failed to create orchestration set: {e}", exc_info=True)
+            raise DatabaseError(f"Failed to create orchestration set: {str(e)}") from e
+        
+        
     def _build_enriched_listing(self, original_listing: OriginalListing, enriched_estate_agent_id: int, description_analysis_model_response: ModelResponse, image_responses: Optional[List[ModelResponse]] = None, floorplan_responses: Optional[List[ModelResponse]] = None) -> ListingCreate:
         """Constructs the ListingCreate payload for the new enriched listing."""
         
@@ -224,6 +231,7 @@ class BaseEnrichmentOrchestrator:
         )
         return listing_create
         
+        
     def _build_orchestration_run(self, original_listing: OriginalListing, enriched_listing_id: Optional[int], description_analysis_model_response: Optional[ModelResponse] = None, image_responses: Optional[List[ModelResponse]] = None, floorplan_responses: Optional[List[ModelResponse]] = None) -> EnrichmentOrchestrationRunCreate:
         """Constructs the EnrichmentOrchestrationRunCreate payload."""
         
@@ -260,8 +268,9 @@ class BaseEnrichmentOrchestrator:
         )
         return orchestration_run
             
+            
     # Enrichment handler methods
-    def _handle_description_analysis(self, listing: OriginalListing) -> Dict[str, Any]:
+    def _handle_description_analysis(self, listing: OriginalListing) -> ModelResponse:
         """Handle description analysis enrichment."""
         if not self.description_analyser_agent:
             raise RuntimeError("Description analyser agent not configured")
@@ -270,52 +279,62 @@ class BaseEnrichmentOrchestrator:
         description = listing.description
         
         if not description:
-            logger.warning(f"No description found for property")
+            raise DescriptionAnalysisError(f"No description found for property {listing.id}")
         
         return self.description_analyser_agent.run(description)
         
     def _handle_floorplan_analysis(self, listing: OriginalListing) -> List[Dict[str, Any]]:
         """Handle floorplan analysis enrichment."""
-        if not self.floorplan_analyser_client:
-            raise RuntimeError("Floorplan analyser client not configured")
+        if not self.floorplan_analyser_agent:
+            raise RuntimeError("Floorplan analyser agent not configured")
         
         if not listing.floorplans:
-            logger.warning(f"No floorplans found for property {listing.id}")
+            logger.info(f"No floorplans found for property {listing.id}, skipping floorplan analysis")
             return []
 
         results = []
         for floorplan in listing.floorplans:
-            # Call floorplan analyser service - mocked
-            analysis = self.floorplan_analyser_client.analyse_floorplan_url(floorplan.url)
-            results.append({
-                "original_floorplan_id": floorplan.id,
-                "analysis": analysis,
-                "version": "mock_floorplan_v1"
-            })
+            try:
+                # Call floorplan analyser service - mocked
+                analysis = self.floorplan_analyser_agent.analyse_floorplan_url(floorplan.url)
+                results.append({
+                    "original_floorplan_id": floorplan.id,
+                    "analysis": analysis,
+                    "version": "mock_floorplan_v1"
+                })
+            except Exception as e:
+                logger.error(f"Failed to analyze floorplan {floorplan.id}: {e}")
+                # Continue with other floorplans even if one fails
+                continue
+        
         return results
             
-    #TODO handle this next
+
     def _handle_image_analysis(self, listing: OriginalListing) -> List[ModelResponse]:
         """Handle image analysis enrichment."""
-        if not self.image_analyser_client:
+        if not self.image_analyser_agent:
             raise RuntimeError("Image analyser client not configured")
             
         if not listing.images:
-            logger.warning(f"No images found for property {listing.id}")
+            logger.info(f"No images found for property {listing.id}, skipping image analysis")
             return []
             
         results = []
         # Call image analyser service for all images
-        # results: List[ModelResponse] = []
-        # for image in listing.images:
-        #     result = self.image_analyser_client.run(image)
-        #     results.append(ModelResponse(
-        #         original_image_id=image.id,
-        #         enriched_image_id=result.enriched_image_id,
-        #         model=result.model,
-        #         prompt=result.prompt,
-        #         response=result.response,
-        #     ))
+        for image in listing.images:
+            try:
+                result = self.image_analyser_agent.run(image)
+                results.append(ModelResponse(
+                    original_image_id=image.id,
+                    enriched_image_id=result.enriched_image_id if hasattr(result, 'enriched_image_id') else None,
+                    model=result.model,
+                    prompt=result.prompt,
+                    response=result.response,
+                ))
+            except Exception as e:
+                logger.error(f"Failed to analyze image {image.id}: {e}")
+                # Continue with other images even if one fails
+                continue
         
         return results
         
